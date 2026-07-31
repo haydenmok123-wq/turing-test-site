@@ -1,4 +1,4 @@
-﻿# 部署已移至 Vercel（vercel.com），此 workflow 已停用。
+# 部署已移至 Vercel（vercel.com），此 workflow 已停用。
 # 保留檔案以避免 GitHub Actions 報錯，不再建置或上傳 GitHub Pages。
 name: Deploy to GitHub Pages
 on:

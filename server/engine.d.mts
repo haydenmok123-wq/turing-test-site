@@ -1,4 +1,4 @@
-﻿export const ROOM_DURATION_MS: number;
+export const ROOM_DURATION_MS: number;
 export const GUESS_UNLOCK_MS: number;
 
 export type EngineOp = {

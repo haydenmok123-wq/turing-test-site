@@ -1,4 +1,4 @@
-﻿{
+{
   "installCommand": "npm ci --include=dev",
   "framework": "nextjs"
 }
