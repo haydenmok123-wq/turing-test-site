@@ -4,7 +4,7 @@
   "private": true,
   "description": "Human vs AI blind test site built with Next.js",
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "directories": {
     "doc": "docs"
