@@ -41,7 +41,7 @@ export default function HomePage() {
 
   function handleStart() {
     const room = createRoomState();
-    router.push(`/room/${room.roomId}`);
+    router.push(`/room?roomId=${room.roomId}`);
   }
 
   function handleAdminAccess() {
@@ -104,7 +104,7 @@ export default function HomePage() {
             {resumeRoomId ? (
               <button
                 className="secondary-button"
-                onClick={() => router.push(`/room/${resumeRoomId}`)}
+                onClick={() => router.push(`/room?roomId=${resumeRoomId}`)}
                 type="button"
               >
                 回到進行中的房間

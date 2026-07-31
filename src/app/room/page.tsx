@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   appendUserMessage,
   formatClock,
@@ -15,10 +15,10 @@ import {
   type RoomState
 } from "@/lib/site";
 
-export default function RoomPage() {
-  const params = useParams<{ roomId: string }>();
+function RoomContent() {
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const roomId = params.roomId;
+  const roomId = searchParams.get("roomId") ?? "";
   const [room, setRoom] = useState<RoomState | null>(null);
   const [draft, setDraft] = useState("");
   const [notice, setNotice] = useState("");
@@ -234,5 +234,13 @@ export default function RoomPage() {
         </section>
       </section>
     </main>
+  );
+}
+
+export default function RoomPage() {
+  return (
+    <Suspense fallback={null}>
+      <RoomContent />
+    </Suspense>
   );
 }
