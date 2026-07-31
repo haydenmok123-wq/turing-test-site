@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { getBackendClient } from "@/lib/backend";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -8,11 +9,13 @@ import {
   createRoomState,
   formatClock,
   getAdminSettings,
+  getDeviceMeta,
   getGuessRemainingMs,
   getRemainingMs,
   getRoom,
   materializePendingReply,
   resolveGuess,
+  saveRoom,
   type RoomState
 } from "@/lib/site";
 
@@ -28,28 +31,91 @@ function RoomContent() {
   const [guessClock, setGuessClock] = useState(0);
   const listRef = useRef<HTMLDivElement | null>(null);
   const syncedRef = useRef(false);
+  const roomIdRef = useRef(roomId);
+  const lastSentRef = useRef("");
+  const [connState, setConnState] = useState<"checking" | "online" | "offline">("checking");
+  const [restarting, setRestarting] = useState(false);
 
   useEffect(() => {
-    const current = getRoom(roomId);
-    if (!current) {
-      return;
-    }
-
-    const hydrated = materializePendingReply(current);
-    setRoom(hydrated);
-    setClock(getRemainingMs(hydrated));
-    setGuessClock(getGuessRemainingMs(hydrated));
-
-    if (!syncedRef.current) {
-      syncedRef.current = true;
-      const historyCount = hydrated.messages.length;
-      setBanner(
-        historyCount > 2
-          ? `已重新連線 · 聊天歷史已同步（${historyCount} 則訊息）`
-          : "已重新連線 · 配對狀態已同步"
-      );
-    }
+    roomIdRef.current = roomId;
   }, [roomId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const current = getRoom(roomId);
+    if (current) {
+      const hydrated = materializePendingReply(current);
+      setRoom(hydrated);
+      setClock(getRemainingMs(hydrated));
+      setGuessClock(getGuessRemainingMs(hydrated));
+      if (!syncedRef.current) {
+        syncedRef.current = true;
+        const historyCount = hydrated.messages.length;
+        setBanner(
+          historyCount > 2
+            ? `已重新連線 · 聊天歷史已同步（${historyCount} 則訊息）`
+            : "已重新連線 · 配對狀態已同步"
+        );
+      }
+    }
+
+    const client = getBackendClient();
+    void (async () => {
+      const meta = getDeviceMeta();
+      const online = await client.probe();
+      if (cancelled) return;
+      if (!online) {
+        setConnState("offline");
+        return;
+      }
+      const serverRoom = await client.resume(meta.id, meta.id, roomId);
+      if (cancelled) return;
+      if (serverRoom) {
+        saveRoom(serverRoom);
+        setRoom(serverRoom);
+        setClock(getRemainingMs(serverRoom));
+        setGuessClock(getGuessRemainingMs(serverRoom));
+        setConnState("online");
+        setBanner("已連上伺服器 · 聊天歷史已同步");
+      } else {
+        setConnState("offline");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId]);
+
+  useEffect(() => {
+    const client = getBackendClient();
+    return client.on((event) => {
+      if (event.type === "room" && event.room.roomId === roomIdRef.current) {
+        saveRoom(event.room);
+        setRoom(event.room);
+        setClock(getRemainingMs(event.room));
+        setGuessClock(getGuessRemainingMs(event.room));
+      } else if (event.type === "sendAck" && event.roomId === roomIdRef.current) {
+        const moderation = event.moderation;
+        if (moderation.allowed) {
+          setNotice(
+            moderation.maskedText !== lastSentRef.current
+              ? "訊息已送出，部分敏感字詞已遮蔽。"
+              : "訊息已送出。"
+          );
+        } else {
+          setNotice(moderation.reason ?? "訊息被攔截。");
+        }
+      } else if (event.type === "peerLeft") {
+        setBanner("對方已離開連線，正在等待對方恢復…");
+      } else if (event.type === "peerBack") {
+        setBanner("對方已恢復連線。");
+      } else if (event.type === "error") {
+        setNotice(event.message);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (!room) {
@@ -114,6 +180,27 @@ function RoomContent() {
   const correct = room?.guess === room?.opponentKind;
 
   function handleRestart() {
+    if (connState === "online") {
+      if (restarting) {
+        return;
+      }
+      setRestarting(true);
+      setNotice("正在重新配對…");
+      void (async () => {
+        const client = getBackendClient();
+        const meta = getDeviceMeta();
+        const result = await client.pair(meta.id, meta.id, getAdminSettings());
+        setRestarting(false);
+        if (result?.roomId) {
+          setNotice("");
+          router.replace(`/room?roomId=${result.roomId}`);
+        } else {
+          setNotice("重新配對失敗，請回首頁再試。");
+        }
+      })();
+      return;
+    }
+
     const nextRoom = createRoomState();
     if (!nextRoom) {
       setNotice("無法建立新房間，請稍後再試。");
@@ -125,6 +212,18 @@ function RoomContent() {
 
   function handleSend() {
     if (!room || roomEnded) {
+      return;
+    }
+
+    if (connState === "online") {
+      const text = draft.trim();
+      if (!text) {
+        return;
+      }
+      lastSentRef.current = text;
+      setDraft("");
+      setNotice("訊息已送出，等待對方回覆…");
+      getBackendClient().send(room.roomId, text);
       return;
     }
 
@@ -146,11 +245,17 @@ function RoomContent() {
         return;
       }
 
+      if (connState === "online") {
+        setNotice("判斷已提交，正在等待結果…");
+        getBackendClient().guess(room.roomId, guess);
+        return;
+      }
+
       const nextRoom = resolveGuess(room, guess);
       setRoom(nextRoom);
       setNotice("判斷已提交。結果已揭曉，聊天鎖定為唯讀。");
     },
-    [guessLocked, roomEnded, room]
+    [connState, guessLocked, roomEnded, room]
   );
 
   if (!room) {
@@ -160,7 +265,7 @@ function RoomContent() {
           <h1>找不到房間</h1>
           <p className="muted">這個房間不存在或已被清除，可能是換了瀏覽器或清除了本機資料。</p>
           <div className="button-row">
-            <button className="primary-button" onClick={handleRestart} type="button">
+            <button className="primary-button" disabled={restarting} onClick={handleRestart} type="button">
               重新來過
             </button>
             <Link className="secondary-button" href="/">
@@ -180,6 +285,13 @@ function RoomContent() {
           圖靈測試 / 盲測房
         </div>
         <div className="button-row" style={{ marginTop: 0 }}>
+          <span className={`status-pill ${connState === "online" ? "success" : ""}`}>
+            {connState === "online"
+              ? "伺服器連線中"
+              : connState === "checking"
+                ? "連線中…"
+                : "本機模式"}
+          </span>
           <span className={`status-pill ${clock <= 60_000 && !roomEnded ? "danger" : ""}`}>
             剩餘時間 {formatClock(clock)}
           </span>
@@ -258,7 +370,7 @@ function RoomContent() {
                 {correct ? "判斷成功，你猜對了對方的身份。" : "判斷失敗，對方其實是" + actualLabel + "。"}
               </p>
               <div className="button-row">
-                <button className="primary-button" onClick={handleRestart} type="button">
+                <button className="primary-button" disabled={restarting} onClick={handleRestart} type="button">
                   重新來過
                 </button>
                 <Link className="ghost-button" href="/">
@@ -277,7 +389,7 @@ function RoomContent() {
                 <em className="result-sub">十分鐘已屆滿，聊天已鎖定為唯讀</em>
               </div>
               <div className="button-row">
-                <button className="primary-button" onClick={handleRestart} type="button">
+                <button className="primary-button" disabled={restarting} onClick={handleRestart} type="button">
                   重新來過
                 </button>
                 <Link className="ghost-button" href="/">

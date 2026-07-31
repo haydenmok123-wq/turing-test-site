@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getBackendClient } from "@/lib/backend";
 import {
   createRoomState,
   defaultAdminSettings,
   getAdminSettings,
+  getDeviceMeta,
   getLatestActiveRoom,
   getLocalStats,
   type LocalStats
@@ -35,8 +37,10 @@ export default function HomePage() {
   const [scanFailed, setScanFailed] = useState(false);
   const [scanStep, setScanStep] = useState(0);
   const [queueCount, setQueueCount] = useState(1);
+  const [pairMode, setPairMode] = useState<"server" | "local" | null>(null);
   const [settingsSummary, setSettingsSummary] = useState(defaultAdminSettings);
   const [stats, setStats] = useState<LocalStats | null>(null);
+  const cancelRequestedRef = useRef(false);
 
   useEffect(() => {
     setSettingsSummary(getAdminSettings());
@@ -82,6 +86,19 @@ export default function HomePage() {
     };
   }, [scanning]);
 
+  useEffect(() => {
+    if (!scanning) {
+      return;
+    }
+
+    const off = getBackendClient().on((event) => {
+      if (event.type === "queued") {
+        setQueueCount(event.position);
+      }
+    });
+    return off;
+  }, [scanning]);
+
   const fairnessText = useMemo(
     () =>
       [
@@ -118,17 +135,55 @@ export default function HomePage() {
     setScanFailed(false);
     setScanStep(0);
     setQueueCount(3);
+    setPairMode(null);
+    cancelRequestedRef.current = false;
 
-    window.setTimeout(() => {
-      const room = createRoomState();
-      setScanning(false);
-      if (!room) {
-        setScanFailed(true);
-        setNotice("無法建立房間，請稍後再試。");
+    void (async () => {
+      const client = getBackendClient();
+      const meta = getDeviceMeta();
+      const online = await client.probe();
+      if (cancelRequestedRef.current) {
         return;
       }
-      router.push(`/room?roomId=${room.roomId}`);
-    }, SCAN_DURATION_MS);
+
+      if (!online) {
+        setPairMode("local");
+        window.setTimeout(() => {
+          if (cancelRequestedRef.current) {
+            return;
+          }
+          const room = createRoomState();
+          setScanning(false);
+          if (!room) {
+            setScanFailed(true);
+            setNotice("無法建立房間，請稍後再試。");
+            return;
+          }
+          router.push(`/room?roomId=${room.roomId}`);
+        }, SCAN_DURATION_MS);
+        return;
+      }
+
+      setPairMode("server");
+      const result = await client.pair(meta.id, meta.id, getAdminSettings());
+      if (cancelRequestedRef.current) {
+        return;
+      }
+      setScanning(false);
+      if (result?.roomId) {
+        setNotice("已連上配對伺服器，配對成功。");
+        router.push(`/room?roomId=${result.roomId}`);
+      } else {
+        setScanFailed(true);
+        setNotice("暫時無法配對，請稍後再試。");
+      }
+    })();
+  }
+
+  function handleCancelScan() {
+    cancelRequestedRef.current = true;
+    setScanning(false);
+    getBackendClient().cancelPair();
   }
 
   function handleAdminAccess() {
@@ -293,7 +348,7 @@ export default function HomePage() {
             {stats && stats.suspiciousCount > 0
               ? `偵測到 ${stats.suspiciousCount} 次可疑行為`
               : ""}
-            所有配對與判斷都在本機匿名處理，不上傳任何對話內容。
+            配對由匿名通道處理，不公開你的身份；對話僅用於本次配對。
           </p>
         </div>
       </section>
@@ -341,7 +396,7 @@ export default function HomePage() {
         <div className="card">
           <h2 style={{ marginTop: 0 }}>本機 AI 設定</h2>
           <p className="muted">
-            AI 對手優先走你設定的本機端點（Ollama / OpenAI 相容 API），連不到時自動退回內建回應庫，遊戲不會中斷。
+            連上伺服器時由後端配對真人或 AI；連不到時自動退回本機模式，AI 對手走你設定的本機端點（Ollama / OpenAI 相容 API），遊戲不會中斷。
           </p>
           <div className="pill" style={{ wordBreak: "break-all" }}>
             {settingsSummary.localAiEndpoint || "未設定本機端點"}
@@ -374,8 +429,14 @@ export default function HomePage() {
               <span className="radar-sweep" />
               <span className="radar-dot" />
             </div>
-            <h2 style={{ marginTop: 18 }}>正在尋找對象</h2>
-            <p className="muted">正在掃描線上對象，請稍候…</p>
+            <h2 style={{ marginTop: 18 }}>
+              {pairMode === "server" ? "正在尋找真人對手…" : "正在尋找對象"}
+            </h2>
+            <p className="muted">
+              {pairMode === "server"
+                ? "已連上配對伺服器，隨機匹配一位匿名真人；若暫時無人，會自動切換 AI 對手。"
+                : "正在掃描線上對象，請稍候…"}
+            </p>
             <div className="queue-line">
               <span className="queue-label">目前同時排隊人數</span>
               <span className="queue-number">{queueCount}</span>
@@ -391,7 +452,7 @@ export default function HomePage() {
                 </span>
               ))}
             </div>
-            <button className="ghost-button" onClick={() => setScanning(false)} type="button">
+            <button className="ghost-button" onClick={handleCancelScan} type="button">
               取消
             </button>
           </div>

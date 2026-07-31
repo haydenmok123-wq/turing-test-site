@@ -350,7 +350,7 @@ export default function AdminPage() {
         <div className="card">
           <h2 style={{ marginTop: 0 }}>保存設定</h2>
           <p className="muted">
-            管理員設定、房間歷史與防作弊資料都保存在瀏覽器本機（localStorage）。重新進入房間會自動同步聊天歷史，換裝置不會帶過去。
+            管理員設定保存在瀏覽器本機；有後端連線時，配對、聊天歷史與判斷會由伺服器同步，換裝置重新進入同一房間也會帶回上下文。
           </p>
           <div className="button-row">
             <button className="primary-button" onClick={handleSave} type="button">
