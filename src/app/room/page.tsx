@@ -62,6 +62,10 @@ function RoomContent() {
 
     const client = getBackendClient();
     void (async () => {
+      if (!getAdminSettings().useBackend) {
+        setConnState("offline");
+        return;
+      }
       const meta = getDeviceMeta();
       const online = await client.probe();
       if (cancelled) return;

@@ -1031,3 +1031,54 @@ select.input {
     padding: 36px 20px 30px;
   }
 }
+
+/* 管理員中心：可收合設定區塊 */
+.admin-fold {
+  padding: 0;
+  overflow: hidden;
+}
+
+.admin-fold summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+}
+
+.admin-fold summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-fold summary h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.admin-fold summary::after {
+  content: "+";
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text-muted, #94a3b8);
+  transition: transform 0.15s ease;
+}
+
+.admin-fold[open] summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-fold[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.admin-fold > .field,
+.admin-fold > p,
+.admin-fold > .muted {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+
+.admin-fold[open] {
+  padding-bottom: 18px;
+}

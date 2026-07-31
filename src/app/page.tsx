@@ -141,7 +141,8 @@ export default function HomePage() {
     void (async () => {
       const client = getBackendClient();
       const meta = getDeviceMeta();
-      const online = await client.probe();
+      const settings = getAdminSettings();
+      const online = settings.useBackend && (await client.probe());
       if (cancelRequestedRef.current) {
         return;
       }
@@ -481,7 +482,7 @@ export default function HomePage() {
           <div className="modal">
             <h2 style={{ marginTop: 0 }}>管理員驗證</h2>
             <p className="muted">
-              輸入管理員密碼以進入管理中心。預設密碼為 <code>398398</code>。
+              輸入管理員密碼以進入管理中心。
             </p>
             <div className="field">
               <label className="field-label" htmlFor="admin-password">

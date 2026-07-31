@@ -59,8 +59,7 @@ function AdminGate({ onUnlocked }: { onUnlocked: () => void }) {
         <div className="panel">
           <h1 style={{ marginTop: 0 }}>管理員驗證</h1>
           <p className="hero-copy">
-            這個入口預設隱藏：在首頁連點「管理員入口」或品牌標誌五下，再輸入密碼
-            <code> 398398 </code> 即可進入。直接輸入網址也必須先通過密碼驗證。
+            這個入口預設隱藏：在首頁連點「管理員入口」或品牌標誌五下即可開啟。直接輸入網址也必須先通過密碼驗證。
           </p>
           <div className="field" style={{ maxWidth: 380 }}>
             <label className="field-label" htmlFor="admin-password">
@@ -163,15 +162,16 @@ export default function AdminPage() {
         <div className="panel">
           <h1 style={{ marginTop: 0 }}>管理員中心</h1>
           <p className="hero-copy">
-            在首頁連點「管理員入口」五下並輸入 <code>398398</code> 進入。你可以在這裡微調過濾、
-            配對公平性與本地 AI 設定。所有資料保存在這台裝置的瀏覽器本機。
+            你可以在這裡選擇配對模式、微調過濾與本地 AI 設定。
           </p>
           {saved ? <p className="alert ok">設定已保存到本機，重新整理後仍會保留。</p> : null}
         </div>
 
         {stats ? (
-          <div className="card">
-            <h2 style={{ marginTop: 0 }}>本機統計</h2>
+          <details className="card admin-fold" open>
+            <summary>
+              <h2 style={{ margin: 0 }}>本機統計</h2>
+            </summary>
             <div className="summary-grid">
               <div className="stat-card">
                 <span className="stat-label">裝置 ID</span>
@@ -202,12 +202,32 @@ export default function AdminPage() {
                 <div className="stat-value">{stats.suspiciousCount}</div>
               </div>
             </div>
-          </div>
+          </details>
         ) : null}
 
+        <div className="card">
+          <h2 style={{ marginTop: 0 }}>配對模式</h2>
+          <label className="field" htmlFor="useBackend">
+            <span className="field-label">使用後端 API（真人跨裝置配對）</span>
+            <select
+              className="input"
+              id="useBackend"
+              onChange={(event) => update("useBackend", event.target.value === "true")}
+              value={String(settings.useBackend)}
+            >
+              <option value="true">開啟：配對真人 / AI，跨裝置同步聊天</option>
+              <option value="false">關閉：只用本機模式</option>
+            </select>
+          </label>
+          <p className="muted" style={{ marginBottom: 0 }}>
+            關閉後配對與聊天全部在本機進行，不連後端；適合只想單機遊玩時。
+          </p>
+        </div>
         <div className="admin-grid">
-          <div className="card">
-            <h2 style={{ marginTop: 0 }}>敏感詞遮蔽</h2>
+          <details className="card admin-fold" open>
+            <summary>
+              <h2 style={{ margin: 0 }}>敏感詞遮蔽</h2>
+            </summary>
             <p className="muted">每行一個。命中後送出前會以星號遮蔽。</p>
             <label className="field" htmlFor="maskWords">
               <span className="field-label">遮蔽詞清單</span>
@@ -218,10 +238,12 @@ export default function AdminPage() {
                 value={listToText(settings.maskWords)}
               />
             </label>
-          </div>
+          </details>
 
-          <div className="card">
-            <h2 style={{ marginTop: 0 }}>高風險阻擋</h2>
+          <details className="card admin-fold">
+            <summary>
+              <h2 style={{ margin: 0 }}>高風險阻擋</h2>
+            </summary>
             <p className="muted">每行一個。命中後整則訊息攔截、不會送出。</p>
             <label className="field" htmlFor="blockWords">
               <span className="field-label">禁止詞清單</span>
@@ -232,10 +254,12 @@ export default function AdminPage() {
                 value={listToText(settings.blockWords)}
               />
             </label>
-          </div>
+          </details>
 
-          <div className="card">
-            <h2 style={{ marginTop: 0 }}>配對公平性</h2>
+          <details className="card admin-fold">
+            <summary>
+              <h2 style={{ margin: 0 }}>配對公平性</h2>
+            </summary>
             <label className="field" htmlFor="repeatPairCooldownMinutes">
               <span className="field-label">重複配對冷卻分鐘數</span>
               <input
@@ -258,10 +282,12 @@ export default function AdminPage() {
                 value={settings.suspiciousJoinThreshold}
               />
             </label>
-          </div>
+          </details>
 
-          <div className="card">
-            <h2 style={{ marginTop: 0 }}>訊息安全</h2>
+          <details className="card admin-fold">
+            <summary>
+              <h2 style={{ margin: 0 }}>訊息安全</h2>
+            </summary>
             <label className="field" htmlFor="messageMaxLength">
               <span className="field-label">單則訊息字數上限</span>
               <input
@@ -274,10 +300,12 @@ export default function AdminPage() {
                 value={settings.messageMaxLength}
               />
             </label>
-          </div>
+          </details>
 
-          <div className="card">
-            <h2 style={{ marginTop: 0 }}>本地 AI 設定</h2>
+          <details className="card admin-fold">
+            <summary>
+              <h2 style={{ margin: 0 }}>本地 AI 設定</h2>
+            </summary>
             <label className="field" htmlFor="useLocalAi">
               <span className="field-label">使用本地 AI 生成對手回覆</span>
               <select
@@ -317,10 +345,12 @@ export default function AdminPage() {
                 value={settings.aiSystemPrompt}
               />
             </label>
-          </div>
+          </details>
 
-          <div className="card">
-            <h2 style={{ marginTop: 0 }}>回覆節奏</h2>
+          <details className="card admin-fold">
+            <summary>
+              <h2 style={{ margin: 0 }}>回覆節奏</h2>
+            </summary>
             <p className="muted">真人與 AI 對手的回覆延遲範圍（毫秒）。</p>
             <label className="field" htmlFor="replyDelayMinMs">
               <span className="field-label">最短延遲 (ms)</span>
@@ -344,7 +374,7 @@ export default function AdminPage() {
                 value={settings.replyDelayMaxMs}
               />
             </label>
-          </div>
+          </details>
         </div>
 
         <div className="card">

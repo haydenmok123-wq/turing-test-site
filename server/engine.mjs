@@ -26,7 +26,8 @@ const DEFAULT_SETTINGS = {
   aiSystemPrompt: DEFAULT_AI_PROMPT,
   replyDelayMinMs: 1800,
   replyDelayMaxMs: 4200,
-  messageMaxLength: 500
+  messageMaxLength: 500,
+  useBackend: true
 };
 
 const g = globalThis;
@@ -65,7 +66,8 @@ function sanitizeSettings(raw) {
     aiSystemPrompt: String(raw.aiSystemPrompt || ""),
     replyDelayMinMs: Number(raw.replyDelayMinMs) || base.replyDelayMinMs,
     replyDelayMaxMs: Number(raw.replyDelayMaxMs) || base.replyDelayMaxMs,
-    messageMaxLength: Number(raw.messageMaxLength) || base.messageMaxLength
+    messageMaxLength: Number(raw.messageMaxLength) || base.messageMaxLength,
+    useBackend: raw.useBackend !== false
   };
 }
 

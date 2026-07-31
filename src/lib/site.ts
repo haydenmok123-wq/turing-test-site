@@ -54,6 +54,7 @@ export type AdminSettings = {
   replyDelayMinMs: number;
   replyDelayMaxMs: number;
   messageMaxLength: number;
+  useBackend: boolean;
 };
 
 export type LocalStats = {
@@ -130,7 +131,8 @@ export const defaultAdminSettings: AdminSettings = {
     "你正在參與一場雙向盲測圖靈測試。對方是人類，正在試圖判斷你是真人還是 AI。請用自然、簡短、有個人色彩的方式回應，不要自稱是 AI，不要承認你是模型，也不要過度正式。每次回覆控制在 1-2 句，可以反問對方。",
   replyDelayMinMs: 1800,
   replyDelayMaxMs: 4200,
-  messageMaxLength: 500
+  messageMaxLength: 500,
+  useBackend: true
 };
 
 const humanReplyBank = [
