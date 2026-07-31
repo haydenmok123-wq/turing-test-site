@@ -9,26 +9,41 @@ import {
   getLatestActiveRoom
 } from "@/lib/site";
 
+const ADMIN_PASSWORD = "398398";
+const ADMIN_TRIGGER_CLICKS = 5;
+
 export default function HomePage() {
   const router = useRouter();
-  const [clickCount, setClickCount] = useState(0);
+  const [brandClicks, setBrandClicks] = useState(0);
+  const [footerClicks, setFooterClicks] = useState(0);
   const [password, setPassword] = useState("");
   const [adminOpen, setAdminOpen] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [resumeRoomId, setResumeRoomId] = useState<string | null>(null);
   const [settingsSummary, setSettingsSummary] = useState(defaultAdminSettings);
 
   useEffect(() => {
     setSettingsSummary(getAdminSettings());
-    setResumeRoomId(getLatestActiveRoom()?.roomId ?? null);
+    const active = getLatestActiveRoom();
+    setResumeRoomId(active?.roomId ?? null);
   }, []);
 
   useEffect(() => {
-    if (clickCount >= 5) {
+    if (brandClicks >= ADMIN_TRIGGER_CLICKS) {
       setAdminOpen(true);
-      setClickCount(0);
+      setBrandClicks(0);
+      setFooterClicks(0);
     }
-  }, [clickCount]);
+  }, [brandClicks]);
+
+  useEffect(() => {
+    if (footerClicks >= ADMIN_TRIGGER_CLICKS) {
+      setAdminOpen(true);
+      setFooterClicks(0);
+      setBrandClicks(0);
+    }
+  }, [footerClicks]);
 
   const fairnessText = useMemo(
     () =>
@@ -39,13 +54,35 @@ export default function HomePage() {
     [settingsSummary]
   );
 
+  const adminProgress = useMemo(
+    () => Array.from({ length: ADMIN_TRIGGER_CLICKS }, (_, index) => index < footerClicks),
+    [footerClicks]
+  );
+
   function handleStart() {
+    const active = getLatestActiveRoom();
+    if (active) {
+      setNotice("偵測到一間進行中的房間，已幫你續接，聊天歷史不會丟失。");
+      router.push(`/room?roomId=${active.roomId}`);
+      return;
+    }
+
     const room = createRoomState();
+    if (!room) {
+      setNotice("無法建立房間，請稍後再試。");
+      return;
+    }
+
     router.push(`/room?roomId=${room.roomId}`);
   }
 
   function handleAdminAccess() {
-    if (password === "398398") {
+    if (password === ADMIN_PASSWORD) {
+      try {
+        window.sessionStorage.setItem("turing-test-admin-auth", "1");
+      } catch {
+        // ignore
+      }
       setAdminOpen(false);
       setPassword("");
       setError("");
@@ -56,12 +93,22 @@ export default function HomePage() {
     setError("管理員密碼不正確。");
   }
 
+  function closeAdmin() {
+    setAdminOpen(false);
+    setPassword("");
+    setError("");
+    setBrandClicks(0);
+    setFooterClicks(0);
+  }
+
   return (
     <main className="page-shell">
       <div className="top-bar">
         <button
+          aria-label="品牌標誌（連點五次開啟管理員入口）"
           className="brand ghost-button"
-          onClick={() => setClickCount((count) => count + 1)}
+          onClick={() => setBrandClicks((count) => count + 1)}
+          title="圖靈測試"
           type="button"
         >
           <span className="brand-mark" />
@@ -111,6 +158,12 @@ export default function HomePage() {
               </button>
             ) : null}
           </div>
+
+          {notice ? (
+            <p className="alert ok" role="status">
+              {notice}
+            </p>
+          ) : null}
         </div>
 
         <aside className="stack">
@@ -126,7 +179,7 @@ export default function HomePage() {
               <div className="info-card">
                 <strong>判斷按鈕延遲解鎖</strong>
                 <p className="muted">
-                  開始聊天 10 秒後，底部才會出現可用的 `對方是真人` 與 `對方是 AI` 按鈕。
+                  開始聊天 10 秒後，底部才會出現可用的「對方是真人」與「對方是 AI」按鈕。
                 </p>
               </div>
               <div className="info-card">
@@ -156,28 +209,52 @@ export default function HomePage() {
           <div className="card">
             <h2 style={{ marginTop: 0 }}>本地 AI 介面</h2>
             <p className="muted">
-              AI 對手預留本地部署欄位。你可以在管理員中心設定本地端點與模型名稱，現在預設端點是：
+              AI 對手優先走你設定的本地部署端點（Ollama / OpenAI 相容 API），連不到時自動退回內建回應庫，遊戲不會中斷。
             </p>
             <div className="pill" style={{ wordBreak: "break-all" }}>
-              {settingsSummary.localAiEndpoint}
+              {settingsSummary.localAiEndpoint || "未設定本地端點"}
             </div>
           </div>
         </aside>
       </section>
 
+      <footer className="footer-bar">
+        <button
+          aria-label="管理員入口（連點五次）"
+          className="admin-trigger"
+          onClick={() => setFooterClicks((count) => count + 1)}
+          type="button"
+        >
+          <span className="admin-trigger-dots">
+            {adminProgress.map((lit, index) => (
+              <i aria-hidden="true" className={lit ? "dot lit" : "dot"} key={index} />
+            ))}
+          </span>
+          管理員入口
+        </button>
+      </footer>
+
       {adminOpen ? (
         <div className="overlay">
           <div className="modal">
-            <h2 style={{ marginTop: 0 }}>管理員中心</h2>
-            <p className="muted">已觸發隱藏入口，輸入密碼 `398398` 才能進入。</p>
+            <h2 style={{ marginTop: 0 }}>管理員驗證</h2>
+            <p className="muted">
+              輸入管理員密碼以進入管理中心。預設密碼為 <code>398398</code>。
+            </p>
             <div className="field">
               <label className="field-label" htmlFor="admin-password">
                 管理員密碼
               </label>
               <input
+                autoFocus
                 className="input"
                 id="admin-password"
                 onChange={(event) => setPassword(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    handleAdminAccess();
+                  }
+                }}
                 type="password"
                 value={password}
               />
@@ -185,17 +262,9 @@ export default function HomePage() {
             {error ? <p className="alert">{error}</p> : null}
             <div className="button-row">
               <button className="primary-button" onClick={handleAdminAccess} type="button">
-                進入管理中心
+                驗證並進入
               </button>
-              <button
-                className="ghost-button"
-                onClick={() => {
-                  setAdminOpen(false);
-                  setPassword("");
-                  setError("");
-                }}
-                type="button"
-              >
+              <button className="ghost-button" onClick={closeAdmin} type="button">
                 取消
               </button>
             </div>
