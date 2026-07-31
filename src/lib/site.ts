@@ -61,6 +61,11 @@ export type LocalStats = {
   roomCount: number;
   activeRoomCount: number;
   resolvedCount: number;
+  correctCount: number;
+  wrongCount: number;
+  guessRate: number | null;
+  bestStreak: number;
+  fastestGuessMs: number | null;
   humanMatches: number;
   aiMatches: number;
   suspiciousCount: number;
@@ -682,12 +687,32 @@ export function getLocalStats(): LocalStats {
   const rooms = Object.values(getRoomsMap());
   const meta = getDeviceMeta();
   const now = Date.now();
+  const resolved = rooms.filter((room) => Boolean(room.resolvedAt));
+  const correct = resolved.filter((room) => room.guess === room.opponentKind);
+  const byResolved = [...resolved].sort((a, b) => (a.resolvedAt ?? 0) - (b.resolvedAt ?? 0));
+
+  let bestStreak = 0;
+  let streak = 0;
+  for (const room of byResolved) {
+    streak = room.guess === room.opponentKind ? streak + 1 : 0;
+    bestStreak = Math.max(bestStreak, streak);
+  }
+
+  const fastestGuessMs = resolved.reduce((min, room) => {
+    const elapsed = (room.resolvedAt ?? 0) - room.createdAt;
+    return elapsed > 0 ? Math.min(min, elapsed) : min;
+  }, Infinity);
 
   return {
     deviceId: meta.id,
     roomCount: rooms.length,
     activeRoomCount: rooms.filter((room) => room.expiresAt > now && !room.resolvedAt).length,
-    resolvedCount: rooms.filter((room) => Boolean(room.resolvedAt)).length,
+    resolvedCount: resolved.length,
+    correctCount: correct.length,
+    wrongCount: resolved.length - correct.length,
+    guessRate: resolved.length ? Math.round((correct.length / resolved.length) * 100) : null,
+    bestStreak,
+    fastestGuessMs: Number.isFinite(fastestGuessMs) ? fastestGuessMs : null,
     humanMatches: meta.humanMatches,
     aiMatches: meta.aiMatches,
     suspiciousCount: rooms.filter((room) =>
@@ -695,7 +720,6 @@ export function getLocalStats(): LocalStats {
     ).length
   };
 }
-
 export function clearLocalData() {
   if (!hasWindow()) {
     return;
